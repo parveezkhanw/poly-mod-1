@@ -1,39 +1,67 @@
-// We require the Hardhat Runtime Environment explicitly here. This is optional
-// but useful for running the script in a standalone fashion through `node <script>`.
-//
-// You can also run a script with `npx hardhat run <script>`. If you do that, Hardhat
-// will compile your contracts, add the Hardhat Runtime Environment's members to the
-// global scope, and execute the script.
-const hre = require("hardhat");
-const fxRootContractABI = require("../fxRootContractABI.json");
-const tokenContractJSON = require("../artifacts/contracts/MetaToken.sol/MetaToken.json");
+// Import necessary packages and contracts
+const { ethers } = require("hardhat");
+const { FXRootContractAbi } = require('../artifacts/fxRootContractABI.js');
+const ABI = require('../artifacts/contracts/CuteCats.sol/CuteCats.json');
+require('dotenv').config();
 
-const tokenAddress = ""; // place your erc20 contract address here
-const tokenABI = tokenContractJSON.abi;
-const fxERC20RootAddress = "0x3658ccFDE5e9629b0805EB06AaCFc42416850961";
-const walletAddress = ""; // place your public address for your wallet here
-
+//Transfer ERC721A tokens to the Ethereum FxChain network
 async function main() {
 
-    const tokenContract = await hre.ethers.getContractAt(tokenABI, tokenAddress);
-    const fxContract = await hre.ethers.getContractAt(fxRootContractABI, fxERC20RootAddress);
+  // Set up connections to network and wallet
+  const networkAddress = 'https://rpc.sepolia.org';
+  const privateKey = process.env.PRIVATE_KEY;
+  const provider = new ethers.providers.JsonRpcProvider(networkAddress);
 
-    const approveTx = await tokenContract.approve(fxERC20RootAddress, 500);
-    await approveTx.wait();
+  // Create a wallet instance
+  const wallet = new ethers.Wallet(privateKey, provider);
 
-    console.log('Approval confirmed');
+  // Get the signer instance
+  const [signer] = await ethers.getSigners();
+  
+  // Get ERC721A contract instance
+  const NFT = await ethers.getContractFactory("CuteCats");
+  const nft = await NFT.attach('0xB72c286F1fD6a8121466F3b611819d4b0afC00A6');
 
+  // Get FXRoot contract instance
+  const fxRootAddress = '0xF9bc4a80464E48369303196645e876c8C7D972de';
+  const fxRoot = await ethers.getContractAt(FXRootContractAbi, fxRootAddress);
 
-    const depositTx = await fxContract.deposit(tokenAddress, walletAddress, 500, "0x6556");
+  // TokenIds to transfer
+  const tokenIds = [0, 1, 2, 3, 4]; 
+
+  // Approve the nfts for transfer
+  const approveTx = await nft.connect(signer).setApprovalForAll(fxRootAddress, true);
+  await approveTx.wait();
+  console.log('Approved confirmed');
+
+  // Deposit the nfts to the FXRoot contracts
+  for (let i = 0; i < tokenIds; i++) {
+    const depositTx = await fxRoot.connect(signer).deposit(
+      nft.address,
+      wallet.address, 
+      tokenIds[i],
+      '0x6566'
+    );
+
+    // Wait for the deposit to be confirmed
     await depositTx.wait();
-
-    console.log("Tokens deposited");
-  
   }
+
+  console.log("Approved and deposited");
+
   
-  // We recommend this pattern to be able to use async/await everywhere
-  // and properly handle errors.
-  main().catch((error) => {
+  // Test balanceOf
+  // const balance = await nft.balanceOf(wallet.address);
+
+  // // Print the balance of the wallet
+  // console.log("CuteCats wallet balance", wallet.address, "is: ", balance.toString(),"BH");
+}
+
+
+// Call the main function and handle any errors
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
     console.error(error);
-    process.exitCode = 1;
+    process.exit(1);
   });
