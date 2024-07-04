@@ -1,30 +1,42 @@
-// We require the Hardhat Runtime Environment explicitly here. This is optional
-// but useful for running the script in a standalone fashion through `node <script>`.
-//
-// You can also run a script with `npx hardhat run <script>`. If you do that, Hardhat
-// will compile your contracts, add the Hardhat Runtime Environment's members to the
-// global scope, and execute the script.
-const hre = require("hardhat");
-const tokenContractJSON = require("../artifacts/contracts/MetaToken.sol/MetaToken.json");
-require('dotenv').config()
 
-const tokenAddress = ""; // place your erc20 contract address here
-const tokenABI = tokenContractJSON.abi;
-const walletAddress = ""; // place your public address for your wallet here
+// Import required libraries
+const { ethers } = require("hardhat");
+require("dotenv").config();
+
+// Function to batch mint tokens
+async function batchMintTokens(privateKey, contractAddress, numTokens) {
+  try {
+    // Create a provider using the network URL
+    const networkAddress = "https://rpc.sepolia.org";
+    const provider = new ethers.providers.JsonRpcProvider(networkAddress);
+
+    // Create a signer from the private key and provider
+    const signer = new ethers.Wallet(privateKey, provider);
+
+    // Get the contract factory and attach it to the signer
+    const NFT = await ethers.getContractFactory("CuteCats", signer);
+    const contract = await NFT.attach(contractAddress);
+
+    // Call the mint function on the contract to mint 'numTokens' tokens
+    await contract.mint(numTokens);
+
+    // Log a message to the console to indicate that the tokens have been minted
+    console.log(`${numTokens} tokens minted successfully.`);
+  } catch (error) {
+    console.error("Error minting tokens:", error);
+    process.exit(1);
+  }
+}
 
 async function main() {
+  const privateKey = process.env.PRIVATE_KEY;
+  const contractAddress = "0xB72c286F1fD6a8121466F3b611819d4b0afC00A6";
 
-    const token = await hre.ethers.getContractAt(tokenABI, tokenAddress);
-  
-    const tx = await token.mint(walletAddress, 1000);
-    await tx.wait();
+  // Batch mint 5 tokens
+  await batchMintTokens(privateKey, contractAddress, 5);
+}
 
-    console.log("You now have: " + await token.balanceOf(walletAddress) + " tokens");
-  }
-  
-  // We recommend this pattern to be able to use async/await everywhere
-  // and properly handle errors.
-  main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
+main().then(() => process.exit(0)).catch(error => {
+  console.error(error);
+  process.exit(1);
+});
